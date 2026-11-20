@@ -1,4 +1,4 @@
-# KV-Cache Aware Routing Demo (llm-d)
+# KV-Cache Aware Routing Demo using llm-d
 
 Same vLLM pods, two ways in. See for yourself what happens when the router knows what each pod has cached.
 
@@ -9,7 +9,9 @@ client ─────────┤                               ├─> the 
                                     both front the SAME 2 vLLM pods
 ```
 
-Built on the upstream [llm-d precise prefix-cache routing guide](https://llm-d.ai/docs/well-lit-paths/foundations/precise-prefix-cache-routing) (pinned to `release-1.0`). This repo adds **hardware profiles**, a **baseline** to compare against, and **scripts** to run and measure the comparison. Nothing upstream is forked.
+Built on the upstream [llm-d precise prefix-cache routing guide](https://llm-d.ai/docs/well-lit-paths/foundations/precise-prefix-cache-routing) (pinned to `release-1.0`). This repo adds **hardware profiles**, a **baseline** to compare against, and **scripts** to run and measure the comparison. 
+
+Nothing upstream is forked.
 
 ## How it works (one paragraph)
 
@@ -47,14 +49,14 @@ The steps follow the upstream [precise prefix-cache routing guide](https://llm-d
 ### 1. k3s (single node)
 
 ```bash
-# Optional: keep k3s data on a large disk (here an NVMe mounted at /mnt/nvme0n1)
+# create config.yaml (here an NVMe mounted at /mnt/nvme0n1). 
 sudo mkdir -p /etc/rancher/k3s
 sudo tee /etc/rancher/k3s/config.yaml <<EOF2
 data-dir: /mnt/nvme0n1/k3s
-kubelet-arg:
-  - "root-dir=/mnt/nvme0n1/kubelet"
+kubelet-arg:                               
+  - "root-dir=/mnt/nvme0n1/kubelet"   # skip if you've enough space already.        
 disable:
-  - traefik
+  - traefik                           # this is required    
 write-kubeconfig-mode: "0644"
 EOF2
 
@@ -90,6 +92,7 @@ kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extens
 
 # Namespace and Hugging Face token (a read token from https://huggingface.co/settings/tokens;
 # the pods use it to download the model)
+# An empty token might work in case of open weights, not tested
 export HF_TOKEN=<your-hf-read-token>
 kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic llm-d-hf-token --from-literal=HF_TOKEN=${HF_TOKEN} -n ${NAMESPACE}
@@ -145,7 +148,7 @@ A JSON reply with a `choices` field means the router and both pods are serving.
 
 ## How to use the scripts
 
-Run them from the root of this repo, with `kubectl` pointing at the cluster. They use the default namespace and model above; override with `NAMESPACE`, `GUIDE_NAME` and `MODEL` if you changed them.
+Run them from the root of your repo, with `kubectl` pointing at the cluster. They use the default namespace and model above; override with `NAMESPACE`, `GUIDE_NAME` and `MODEL` if you changed them.
 
 | Script | What it does |
 |---|---|
@@ -189,7 +192,8 @@ kubectl wait pod -n llm-d-precise-prefix-cache-routing -l llm-d.ai/guide=precise
 ./scripts/stats.sh reset
 ```
 
-**Grafana** (with monitoring): `kubectl port-forward -n llm-d-monitoring svc/llmd-grafana 3000:80`, then from your laptop `ssh -L 3000:localhost:3000 <server>` and open `http://localhost:3000`. Log in as `admin`; the password is in secret `llmd-grafana`, key `admin-password`. The dashboards worth opening are **llm-d Performance Dashboard** (per-pod cache hit rates, TTFT) and **llm-d Diagnostic Drill-Down** (request distribution).
+**Grafana** 
+The dashboards worth opening are **llm-d Performance Dashboard** (per-pod cache hit rates, TTFT) and **llm-d Diagnostic Drill-Down** (request distribution).
 
 ## Notes and gotchas
 
