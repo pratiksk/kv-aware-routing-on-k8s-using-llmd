@@ -31,3 +31,33 @@ The pod is random per connection, and this run split 8/2. Both pods computed and
 | B | 0 | 0 | 0 | — |
 
 The router remembered where the prefix lived, so even the first request was a hit.
+
+## Many users (`test-multiuser.sh`)
+
+Each user has their own ~2.7k-token prefix; users take turns, one request at a time. All prefixes together exceed one pod's KV cache (~37k tokens) but fit in both pods' caches.
+
+**Through llm-d, 20 users × 6 rounds:**
+
+```
+POD     |      REQ    QUERIED        HIT   HIT%
+--------+--------------------------------------
+972v6   |       66     185928     153600    83%
+blqrv   |       54     152232     125760    83%
+--------+--------------------------------------
+TOTAL   |      120     338160     279360    83%
+```
+
+**Through the plain Service, 20 users × 6 rounds:**
+
+```
+POD     |      REQ    QUERIED        HIT   HIT%
+--------+--------------------------------------
+972v6   |       54     151632      74432    49%
+blqrv   |       66     186528      81856    44%
+--------+--------------------------------------
+TOTAL   |      120     338160     156288    46%
+```
+
+Same workload on both routes: 120 requests, 338,160 prompt tokens looked up. llm-d: 83% (every request after round 1 hits, 5/6). Plain Service: 46%.
+
+**Sizing note:** with too many users (e.g. 35 × ~2.7k ≈ 96k tokens, more than both pods together), both routes drop to about 0% hits: users take turns in a fixed order, and the least-recently-used eviction always evicts the prefix that is needed next. Keep the total prefix size between one and two pods' cache size.

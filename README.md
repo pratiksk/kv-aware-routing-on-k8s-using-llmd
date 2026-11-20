@@ -21,10 +21,23 @@ vLLM stores the KV cache in blocks of 64 tokens and publishes a `BlockStored` / 
 
 10 requests sharing a ~1.5k-token prefix, sent one after another (`scripts/test-prefix.sh`):
 
-| | Requests per pod | Prefix cache hit rate |
-|---|---|---|
-| **via llm-d** | **10 / 0** (all on the warm pod) | **87%** |
-| via plain Service | random, e.g. 8 / 2 | 76%: the prefix is computed on both pods |
+| Route | Requests to pod A | Requests to pod B | Prefix cache hit rate |
+|---|---|---|---|
+| **llm-d router** | **10** | **0** | **87%** |
+| Plain Kubernetes Service | 8 | 2 | 76% |
+
+With llm-d, the first request computes the prefix and the other 9 go to the pod that has it cached. With the plain Service, pods are picked at random (the split varies per run), so both pods compute and store the same prefix.
+
+Many users, each with their own ~2.7k-token prefix, taking turns over several rounds (`scripts/test-multiuser.sh`). All prefixes together are more than one pod's KV cache (~37k tokens) can hold, but fit in both pods' caches:
+
+20 users × 6 rounds = 120 requests, same workload on both routes (338,160 prompt tokens each):
+
+| Route | Requests to pod A | Requests to pod B | Prefix cache hit rate |
+|---|---|---|---|
+| **llm-d router** | 66 | 54 | **83%** |
+| Plain Kubernetes Service | 54 | 66 | 46% |
+
+llm-d keeps each user on one pod, so each pod caches only its own users' prefixes, and they fit: every request after the first round is a hit (5 of 6 rounds ≈ 83%). With the plain Service, every pod sees every user, tries to cache all prefixes, runs out of space, and evicts prefixes before their users come back. Both routes split the load about evenly; the difference is which requests go where.
 
 These numbers come from routing, not hardware, so they reproduce on any profile. Only latency changes. Full output: [docs/results.md](docs/results.md).
 
@@ -170,16 +183,16 @@ A comparison run:
 ./scripts/stats.sh
 ```
 
-`stats.sh` output looks like this (a real run: `test-multiuser.sh llmd 18 5`, 18 users, 5 rounds, through llm-d):
+`stats.sh` output looks like this (a real run: `test-multiuser.sh llmd 20 6`, 20 users, 6 rounds, through llm-d):
 
 ```
-Since last run (19:41:21):
+Since last run (21:23:59):
 POD     |      REQ    QUERIED        HIT   HIT%
 --------+--------------------------------------
-972v6   |       48     133584     110400    83%
-blqrv   |       42     117336      96960    83%
+972v6   |       66     185928     153600    83%
+blqrv   |       54     152232     125760    83%
 --------+--------------------------------------
-TOTAL   |       90     250920     207360    83%
+TOTAL   |      120     338160     279360    83%
 ```
 
 The test scripts also print Grafana links for the run's time window. Set `GRAFANA_URL` if Grafana is not at `http://localhost:3000` in your browser.
