@@ -23,7 +23,7 @@ vLLM stores the KV cache in blocks of 64 tokens and publishes a `BlockStored` / 
 
 | Route | Requests to pod A | Requests to pod B | Prefix cache hit rate |
 |---|---|---|---|
-| **llm-d router** | 66 | 54 | **83%** |
+| llm-d router | 66 | 54 | 83% |
 | Plain Kubernetes Service | 54 | 66 | 46% |
 
 llm-d keeps each user on one pod, so each pod caches only its own users' prefixes, and they fit: every request after the first round is a hit (5 of 6 rounds ≈ 83%). With the plain Service, every pod sees every user, tries to cache all prefixes, runs out of space, and evicts prefixes before their users come back. Both routes split the load about evenly; the difference is which requests go where.
