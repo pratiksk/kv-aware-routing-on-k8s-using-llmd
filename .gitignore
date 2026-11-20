@@ -1,0 +1,4 @@
+llm-d/
+# local credentials (direnv)
+.envrc
+.envrc.local

@@ -1,0 +1,31 @@
+# cpu (UNTESTED): upstream CPU overlay sized down for a workstation.
+# Knobs: VLLM_CPU_KVCACHE_SPACE (GiB of RAM for KV cache per pod), cpu, memory.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: precise-prefix-cache-routing-cpu-vllm-decode
+spec:
+  template:
+    spec:
+      containers:
+        - name: modelserver
+          args:
+            - "Qwen/Qwen3-0.6B"
+            - "--enable-scale-out"
+            - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models,/v1/completions/render,/v1/chat/completions/render"
+            - "--disable-hybrid-kv-cache-manager"
+            - "--max_model_len=8192"
+            - "--block-size=64"
+            - "--kv-events-config"
+            - '{"enable_kv_cache_events":true,"publisher":"zmq","endpoint":"$(KV_EVENTS_ENDPOINT)","replay_endpoint":"$(KV_EVENTS_REPLAY_ENDPOINT)","topic":"kv@$(POD_IP):$(POD_PORT)@Qwen/Qwen3-0.6B"}'
+            - "--shutdown-timeout=45"
+          env:
+            - name: VLLM_CPU_KVCACHE_SPACE
+              value: "4"
+          resources:
+            limits:
+              cpu: "8"
+              memory: 12Gi
+            requests:
+              cpu: "8"
+              memory: 12Gi

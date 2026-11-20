@@ -1,0 +1,48 @@
+# 1gpu-small: 2 vLLM pods on one GPU.
+# Knobs to change for your GPU:
+#   - NVIDIA_VISIBLE_DEVICES: which GPU both pods use
+#   - --kv-cache-memory-bytes: KV cache per pod. Two pods need about
+#     2 x (weights + ~2 GiB + this value) <= GPU memory. 4 GiB fits a 16 GB card.
+# A fixed KV size (not --gpu-memory-utilization) matters here: two pods starting
+# together on one GPU otherwise measure each other's memory and get unequal caches.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: precise-prefix-cache-routing-gpu-vllm-decode
+spec:
+  template:
+    spec:
+      runtimeClassName: nvidia
+      containers:
+        - name: modelserver
+          args:  # replaces the guide's list, so it is complete
+            - "Qwen/Qwen3-0.6B"
+            - "--enable-auto-tool-choice"
+            - "--tool-call-parser=hermes"
+            - "--reasoning-parser=qwen3"
+            - "--kv-cache-memory-bytes=4294967296"
+            - "--max-model-len=8192"
+            - "--enable-scale-out"
+            - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models,/v1/completions/render,/v1/chat/completions/render"
+            - "--tensor-parallel-size=1"
+            - "--block-size=64"
+            - "--kv-events-config"
+            - '{"enable_kv_cache_events":true,"publisher":"zmq","endpoint":"$(KV_EVENTS_ENDPOINT)","replay_endpoint":"$(KV_EVENTS_REPLAY_ENDPOINT)","topic":"kv@$(POD_IP):$(POD_PORT)@Qwen/Qwen3-0.6B"}'
+            - "--shutdown-timeout=45"
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "0"
+          resources:
+            limits:
+              cpu: "8"
+              memory: 16Gi
+              nvidia.com/gpu: null  # GPU comes from runtimeClass + NVIDIA_VISIBLE_DEVICES
+            requests:
+              cpu: "4"
+              memory: 8Gi
+              nvidia.com/gpu: null
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi

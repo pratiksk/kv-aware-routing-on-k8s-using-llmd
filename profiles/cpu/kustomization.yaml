@@ -1,0 +1,7 @@
+# Layered on the upstream guide's CPU overlay (modelserver/cpu/vllm/base).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+patches:
+  - path: patch.yaml
