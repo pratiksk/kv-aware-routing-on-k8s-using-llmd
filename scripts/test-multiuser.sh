@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-multiuser.sh <llmd|direct> [users] [rounds] [label] — UNTESTED
+# test-multiuser.sh <llmd|direct> [users] [rounds] [label]
 # Many "users", each with their own ~2.7k-token prefix (a chat history or document),
 # sending interleaved requests. Size it so all prefixes together are MORE than one
 # pod's KV cache but LESS than all pods' caches combined:

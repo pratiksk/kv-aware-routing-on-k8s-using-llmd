@@ -19,18 +19,7 @@ vLLM stores the KV cache in blocks of 64 tokens and publishes a `BlockStored` / 
 
 ## Results you should see
 
-10 requests sharing a ~1.5k-token prefix, sent one after another (`scripts/test-prefix.sh`):
-
-| Route | Requests to pod A | Requests to pod B | Prefix cache hit rate |
-|---|---|---|---|
-| **llm-d router** | **10** | **0** | **87%** |
-| Plain Kubernetes Service | 8 | 2 | 76% |
-
-With llm-d, the first request computes the prefix and the other 9 go to the pod that has it cached. With the plain Service, pods are picked at random (the split varies per run), so both pods compute and store the same prefix.
-
-Many users, each with their own ~2.7k-token prefix, taking turns over several rounds (`scripts/test-multiuser.sh`). All prefixes together are more than one pod's KV cache (~37k tokens) can hold, but fit in both pods' caches:
-
-20 users × 6 rounds = 120 requests, same workload on both routes (338,160 prompt tokens each):
+20 users, each with their own ~2.7k-token prefix (a chat history or document), taking turns for 6 rounds: 120 requests, the same workload on both routes (`scripts/test-multiuser.sh`). All prefixes together are more than one pod's KV cache (~37k tokens) can hold, but fit in both pods' caches:
 
 | Route | Requests to pod A | Requests to pod B | Prefix cache hit rate |
 |---|---|---|---|
@@ -167,7 +156,7 @@ Run them from the root of your repo, with `kubectl` pointing at the cluster. The
 |---|---|
 | `scripts/stats.sh [reset]` | Per vLLM pod: requests, prompt tokens looked up in the prefix cache, tokens found, hit rate. Shows the change since its previous run, then saves a new baseline. `reset` saves the baseline without printing. |
 | `scripts/test-prefix.sh <llmd\|direct> [label]` | 10 requests sharing a \~1.5k-token prefix, 3 s apart. `llmd` goes through the router, `direct` through the plain Service. The label goes into the prefix, so use a new label per run to start cold. |
-| `scripts/test-multiuser.sh <llmd\|direct> [users] [rounds] [label]` | Many users (default 20), each with their own \~2.7k-token prefix, sending interleaved requests for several rounds (default 6). *(untested)* |
+| `scripts/test-multiuser.sh <llmd\|direct> [users] [rounds] [label]` | Many users (default 20), each with their own \~2.7k-token prefix, sending interleaved requests for several rounds (default 6). Keep all users' prefixes together between one and two pods' KV cache size. |
 
 A comparison run:
 
