@@ -184,7 +184,7 @@ blqrv   |       54     152232     125760    83%
 TOTAL   |      120     338160     279360    83%
 ```
 
-The test scripts also print Grafana links for the run's time window. Set `GRAFANA_URL` if Grafana is not at `http://localhost:3000` in your browser.
+The test scripts print the start and end time of each run (IST), to find the run in Grafana.
 
 **Empty cache:** restart both vLLM pods (counters also go back to 0):
 
